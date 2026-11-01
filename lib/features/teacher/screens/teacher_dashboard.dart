@@ -10,6 +10,7 @@ import 'package:mcq_test_app/core/widgets/app_gradient_background.dart';
 import 'package:mcq_test_app/features/auth/screens/login_screen.dart';
 import 'package:mcq_test_app/features/chat/screens/chat_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/create_test_screen.dart';
+import 'package:mcq_test_app/features/teacher/screens/teacher_materials_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/teacher_messages_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/teacher_profile_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/teacher_results_screen.dart';
@@ -319,6 +320,13 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const TeacherResultsScreen()),
+    );
+  }
+
+  void _openMaterials() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TeacherMaterialsScreen()),
     );
   }
 
@@ -1269,6 +1277,14 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
               onTap: _openResults,
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        _buildWideActionCard(
+          title: 'Study Materials & Links',
+          subtitle: 'Share Drive notes & YouTube video lectures',
+          icon: Icons.video_library_rounded,
+          gradient: const [Color(0xFF0D9488), Color(0xFF14B8A6)],
+          onTap: _openMaterials,
         ),
       ],
     );

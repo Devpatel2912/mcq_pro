@@ -15,6 +15,7 @@ import 'package:mcq_test_app/models/assigned_teacher.dart';
 import 'package:mcq_test_app/models/chat_conversation.dart';
 import 'package:mcq_test_app/models/chat_message.dart';
 import 'package:mcq_test_app/models/chat_test_card.dart';
+import 'package:mcq_test_app/models/study_material.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -2368,5 +2369,158 @@ class SupabaseService {
       )
       ..subscribe();
   }
-}
 
+  // ── Study Materials & Learning Links ──────────────────────────────────────
+  Future<List<StudyMaterial>> getTeacherMaterials(String teacherId) async {
+    try {
+      final res = await supabase
+          .from('study_materials')
+          .select()
+          .eq('teacher_id', teacherId)
+          .order('created_at', ascending: false);
+      return (res as List).map((e) => StudyMaterial.fromMap(Map<String, dynamic>.from(e))).toList();
+    } catch (e) {
+      debugPrint('Error fetching teacher study materials: $e');
+      return [];
+    }
+  }
+
+  Future<void> createStudyMaterial(StudyMaterial material) async {
+    await supabase.from('study_materials').insert(material.toMap());
+  }
+
+  Future<void> updateStudyMaterial(StudyMaterial material) async {
+    if (material.id.isEmpty) throw 'Material ID required for update';
+    final map = material.toMap()..['updated_at'] = DateTime.now().toIso8601String();
+    await supabase.from('study_materials').update(map).eq('id', material.id);
+  }
+
+  Future<void> deleteStudyMaterial(String materialId) async {
+    await supabase.from('study_materials').delete().eq('id', materialId);
+  }
+
+  /// For Admin: Fetch all study materials across all teachers and institutions
+  Future<List<StudyMaterial>> getAllStudyMaterials() async {
+    try {
+      final res = await supabase
+          .from('study_materials')
+          .select()
+          .order('created_at', ascending: false);
+      return (res as List)
+          .map((e) => StudyMaterial.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching all study materials for admin: $e');
+      return [];
+    }
+  }
+
+  /// Fetch eligible students for an assigned section so a teacher can target specific students
+  Future<List<AppUser>> getStudentsForSection({
+    required String institution,
+    required String standard,
+    required String division,
+    required String medium,
+    String? studentGroup,
+  }) async {
+    try {
+      final allStudents = await getAllStudents();
+      final isAcc = institution.toLowerCase().contains('acc');
+      final cleanStd = standard.trim();
+      final cleanDiv = division.trim().toUpperCase();
+      final cleanMed = medium.trim().toLowerCase();
+      final cleanGrp = (studentGroup ?? '').trim().toLowerCase();
+
+      return allStudents.where((s) {
+        final sInst = (s.institution ?? 'Sharda Mandir').toLowerCase();
+        final sIsAcc = sInst.contains('acc');
+        if (isAcc != sIsAcc) return false;
+        if (!isAcc && sInst != institution.toLowerCase()) return false;
+
+        if ((s.studentClass ?? '').trim() != cleanStd) return false;
+
+        var sDiv = (s.division ?? '').trim().toUpperCase();
+        if (sDiv.startsWith('DIV ')) sDiv = sDiv.substring(4).trim();
+        if (!isAcc && sDiv != cleanDiv) return false;
+
+        final sMed = (s.medium ?? 'English').trim().toLowerCase();
+        if (sMed != cleanMed) return false;
+
+        if (cleanGrp.isNotEmpty && cleanGrp != 'all' && cleanGrp != 'both') {
+          final sGrp = (s.studentGroup ?? '').toLowerCase();
+          if (cleanGrp.contains('bio') && !sGrp.contains('bio')) return false;
+          if (cleanGrp.contains('math') && !sGrp.contains('math')) return false;
+        }
+
+        return true;
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching students for section: $e');
+      return [];
+    }
+  }
+
+  Future<List<StudyMaterial>> getStudentStudyMaterials({
+    String? studentId,
+    required String standard,
+    required String division,
+    required String medium,
+    String? studentGroup,
+    String? institution,
+    String? academicYear,
+  }) async {
+    try {
+      final res = await supabase
+          .from('study_materials')
+          .select()
+          .order('created_at', ascending: false);
+
+      final list = (res as List).map((e) => StudyMaterial.fromMap(Map<String, dynamic>.from(e))).toList();
+
+      final cleanStd = standard.trim();
+      final cleanDiv = division.trim().toUpperCase();
+      final cleanMed = medium.trim().toLowerCase();
+      final cleanGrp = (studentGroup ?? '').trim().toLowerCase();
+      final cleanInst = (institution ?? '').trim().toLowerCase();
+
+      return list.where((m) {
+        // 1. Institution check
+        if (cleanInst.isNotEmpty) {
+          final mInst = m.institution.toLowerCase();
+          final sAcc = cleanInst.contains('acc');
+          final mAcc = mInst.contains('acc');
+          if (sAcc != mAcc) return false;
+          if (!sAcc && cleanInst != mInst) return false;
+        }
+
+        // 2. Standard check
+        if (m.standard != 'all' && m.standard != cleanStd) return false;
+
+        // 3. Division check
+        if (m.division != 'all' && m.division.toUpperCase() != cleanDiv) return false;
+
+        // 4. Medium check
+        if (m.medium != 'all' && m.medium.toLowerCase() != cleanMed) return false;
+
+        // 5. Student Group check
+        if (m.studentGroup != 'all' && m.studentGroup != 'Both' && cleanGrp.isNotEmpty) {
+          final mGrp = m.studentGroup.toLowerCase();
+          if (cleanGrp.contains('bio') && !mGrp.contains('bio')) return false;
+          if (cleanGrp.contains('math') && !mGrp.contains('math')) return false;
+        }
+
+        // 6. Targeted individual student check
+        if (m.assignedStudentIds != null && m.assignedStudentIds!.isNotEmpty) {
+          if (studentId == null || !m.assignedStudentIds!.contains(studentId)) {
+            return false;
+          }
+        }
+
+        return true;
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching student study materials: $e');
+      return [];
+    }
+  }
+}

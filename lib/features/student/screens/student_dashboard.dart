@@ -7,6 +7,7 @@ import 'package:mcq_test_app/core/widgets/app_gradient_background.dart';
 import 'package:mcq_test_app/features/auth/screens/login_screen.dart';
 import 'package:mcq_test_app/features/chat/screens/chat_screen.dart';
 import 'package:mcq_test_app/features/student/screens/history_screen.dart';
+import 'package:mcq_test_app/features/student/screens/student_materials_screen.dart';
 import 'package:mcq_test_app/features/student/screens/result_screen.dart';
 import 'package:mcq_test_app/features/student/screens/student_chat_list_screen.dart';
 import 'package:mcq_test_app/features/student/screens/test_taking_screen.dart';
@@ -454,6 +455,19 @@ class _StudentDashboardState extends State<StudentDashboard> {
             context: context,
             studentClass: studentClass,
             studentDivision: studentDiv,
+          ),
+          const SizedBox(height: 14),
+
+          _buildStudyMaterialsCard(
+            context: context,
+            studentClass: studentClass,
+            studentDivision: studentDiv,
+            studentMedium: studentMedium,
+            studentGroup: (user?.studentGroup != null && user!.studentGroup!.isNotEmpty)
+                ? user.studentGroup!
+                : (currentUser?.userMetadata?['student_group']?.toString() ?? 'all'),
+            studentId: currentUser?.id,
+            institution: studentInst,
           ),
           const SizedBox(height: 20),
 
@@ -1284,6 +1298,110 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStudyMaterialsCard({
+    required BuildContext context,
+    required String studentClass,
+    required String studentDivision,
+    required String studentMedium,
+    required String studentGroup,
+    String? studentId,
+    String? institution,
+  }) {
+    return _GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => StudentMaterialsScreen(
+                standard: studentClass,
+                medium: studentMedium,
+                division: studentDivision,
+                studentGroup: studentGroup,
+                studentId: studentId,
+                institution: institution,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withOpacity(0.14),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFF0D9488).withOpacity(0.35),
+                ),
+              ),
+              child: const Icon(
+                Icons.video_library_rounded,
+                color: Color(0xFF0D9488),
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Study Materials ',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.play_circle_fill_rounded, color: Colors.red, size: 10),
+                            SizedBox(width: 2),
+                            Text('Videos', style: TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  // const Text(
+                  //   'Drive notes, PDFs & YouTube lectures shared by teachers',
+                  //   style: TextStyle(
+                  //     fontSize: 12,
+                  //     color: AppColors.textSecondary,
+                  //   ),
+                  // ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
       ),
     );
   }

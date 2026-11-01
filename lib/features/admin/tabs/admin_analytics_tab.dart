@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/widgets/app_card.dart';
+import 'package:mcq_test_app/features/admin/screens/admin_materials_screen.dart';
 import 'package:mcq_test_app/features/admin/screens/admin_password_vault_screen.dart';
 
 class AdminAnalyticsTab extends StatefulWidget {
@@ -116,6 +117,63 @@ class _AdminAnalyticsTabState extends State<AdminAnalyticsTab>
                       SizedBox(height: 2),
                       Text(
                         'Look up passwords or reissue login access for students & teachers',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: AppColors.textMuted,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Study Materials Management Banner
+          AppCard(
+            padding: const EdgeInsets.all(16),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const AdminMaterialsScreen(),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D9488).withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.video_library_rounded,
+                    color: Color(0xFF0D9488),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Study Materials & Lectures',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Manage, view, edit & delete all teacher-shared Drive & YouTube links',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
