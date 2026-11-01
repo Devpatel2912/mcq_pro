@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/services/supabase_service.dart';
 import 'package:mcq_test_app/core/widgets/animated_page.dart';
@@ -46,6 +47,7 @@ class _TestTakingScreenState extends State<TestTakingScreen>
     super.initState();
     _remainingSeconds = widget.test.duration * 60;
     WidgetsBinding.instance.addObserver(this);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _enableSecureMode();   // Block screenshots & screen recording
     _initPhoneStateHandling();
     _loadQuestions();
@@ -126,6 +128,7 @@ class _TestTakingScreenState extends State<TestTakingScreen>
 
   @override
   void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _disableSecureMode(); // Restore screenshots for the rest of the app
     _phoneStateSubscription?.cancel();
     _timer?.cancel();
@@ -135,8 +138,15 @@ class _TestTakingScreenState extends State<TestTakingScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-assert immersive sticky mode when coming back into focus
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      return;
+    }
+
+    // Only auto-submit when the user actually switches away / backgrounds the app (AppLifecycleState.paused)
+    // On Android, pulling down the notification panel fires AppLifecycleState.inactive while remaining in foreground.
+    if (state == AppLifecycleState.paused) {
       // Allow the permission dialog to briefly change lifecycle without submitting.
       if (_isRequestingPermission) return;
 

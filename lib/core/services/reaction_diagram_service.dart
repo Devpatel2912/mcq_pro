@@ -246,7 +246,7 @@ class ReactionDiagramService {
 
     // 1. Background Card
     final bgRRect = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(0, 0, width, height),
+       Rect.fromLTWH(0, 0, width, height),
       const Radius.circular(10),
     );
     final bgPaint = Paint()..color = const Color(0xFFFAFAFA);

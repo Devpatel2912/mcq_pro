@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/services/supabase_service.dart';
+import 'package:mcq_test_app/features/admin/screens/admin_edit_student_screen.dart';
 import 'package:mcq_test_app/features/admin/screens/admin_student_details_screen.dart';
 import 'package:mcq_test_app/features/admin/widgets/student_card.dart';
 import 'package:mcq_test_app/models/app_user.dart';
@@ -255,6 +256,18 @@ class _AdminStudentsTabState extends State<AdminStudentsTab>
 
   // ───────────────────────── Student Details Screen ─────────────────────────
 
+  Future<void> _editStudent(AppUser student) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminEditStudentScreen(student: student),
+      ),
+    );
+    if (updated == true) {
+      widget.onRefresh();
+    }
+  }
+
   void _showStudentDetails(AppUser student) {
     Navigator.push(
       context,
@@ -496,6 +509,7 @@ class _AdminStudentsTabState extends State<AdminStudentsTab>
                       _toggleStudentStatus(student, newStatus),
                   onViewDetails: () => _showStudentDetails(student),
                   onResetPassword: () => _showResetPasswordDialog(student),
+                  onEdit: () => _editStudent(student),
                 ),
               ),
             ),

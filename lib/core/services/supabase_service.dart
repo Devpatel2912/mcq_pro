@@ -459,6 +459,76 @@ class SupabaseService {
     return (maxRoll + 1).toString();
   }
 
+  /// Updates a student's profile and academic enrollment information.
+  /// Synchronizes both public.users and public.student_enrollments.
+  Future<void> updateStudent({
+    required String studentId,
+    required String name,
+    required String studentClass,
+    required String division,
+    required String medium,
+    required String studentGroup,
+    required String rollNo,
+    required String institution,
+    required String academicYear,
+    bool? isActive,
+  }) async {
+    final cleanName = name.trim();
+    final cleanRoll = rollNo.trim();
+    if (cleanName.isEmpty) throw Exception('Student name cannot be empty');
+    if (cleanRoll.isEmpty) throw Exception('Roll number cannot be empty');
+
+    final updateData = <String, dynamic>{
+      'name': cleanName,
+      'class': int.tryParse(studentClass),
+      'division': division,
+      'medium': medium,
+      'student_group': studentGroup,
+      'roll_no': cleanRoll,
+      'institution': institution,
+      'academic_year': academicYear,
+    };
+    if (isActive != null) {
+      updateData['is_active'] = isActive;
+    }
+
+    await supabase.from('users').update(updateData).eq('id', studentId);
+
+    // Synchronize public.student_enrollments
+    try {
+      final existingEnrollment = await supabase
+          .from('student_enrollments')
+          .select('id')
+          .eq('student_id', studentId)
+          .maybeSingle();
+
+      if (existingEnrollment != null) {
+        await supabase.from('student_enrollments').update({
+          'institution': institution,
+          'academic_year': academicYear,
+          'standard': studentClass,
+          'division': division,
+          'medium': medium,
+          'student_group': studentGroup,
+          'roll_no': cleanRoll,
+        }).eq('student_id', studentId);
+      } else {
+        await supabase.from('student_enrollments').insert({
+          'student_id': studentId,
+          'institution': institution,
+          'academic_year': academicYear,
+          'standard': studentClass,
+          'division': division,
+          'medium': medium,
+          'student_group': studentGroup,
+          'roll_no': cleanRoll,
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice: student_enrollments sync on student update: $e');
+    }
+  }
+
   /// Updates a student's roll number in both public.users and public.student_enrollments.
   Future<void> updateStudentRollNumber(String studentId, String newRollNo) async {
     final cleanRoll = newRollNo.trim();

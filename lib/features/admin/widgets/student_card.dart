@@ -8,6 +8,7 @@ class StudentCard extends StatelessWidget {
   final ValueChanged<bool>? onToggleStatus;
   final VoidCallback? onViewDetails;
   final VoidCallback? onResetPassword;
+  final VoidCallback? onEdit;
 
   const StudentCard({
     super.key,
@@ -15,6 +16,7 @@ class StudentCard extends StatelessWidget {
     this.onToggleStatus,
     this.onViewDetails,
     this.onResetPassword,
+    this.onEdit,
   });
 
   @override
@@ -170,10 +172,25 @@ class StudentCard extends StatelessWidget {
           const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 6),
 
-          // Actions Row: Reset Pass, Details, Disable / Enable
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // Actions: Edit, Reset Pass, Details, Disable / Enable
+          Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 2,
             children: [
+              if (onEdit != null)
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 15),
+                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
               if (onResetPassword != null)
                 TextButton.icon(
                   onPressed: onResetPassword,

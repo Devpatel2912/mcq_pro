@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/services/supabase_service.dart';
 import 'package:mcq_test_app/core/widgets/app_gradient_background.dart';
+import 'package:mcq_test_app/features/admin/screens/admin_edit_student_screen.dart';
 import 'package:mcq_test_app/features/admin/widgets/student_progress_chart.dart';
 import 'package:mcq_test_app/features/student/screens/result_screen.dart';
 import 'package:mcq_test_app/models/app_user.dart';
@@ -210,6 +211,18 @@ class _AdminStudentDetailsScreenState extends State<AdminStudentDetailsScreen>
     }
   }
 
+  Future<void> _openEditStudentScreen() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminEditStudentScreen(student: _student),
+      ),
+    );
+    if (updated == true) {
+      _loadAllStudentData();
+    }
+  }
+
   void _showResetPasswordDialog() {
     final passController = TextEditingController(text: 'Pass@1234');
     showDialog(
@@ -395,6 +408,11 @@ class _AdminStudentDetailsScreenState extends State<AdminStudentDetailsScreen>
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_rounded),
+            tooltip: 'Edit Student Data',
+            onPressed: _openEditStudentScreen,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
@@ -693,6 +711,23 @@ class _AdminStudentDetailsScreenState extends State<AdminStudentDetailsScreen>
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _openEditStudentScreen,
+              icon: const Icon(Icons.edit_rounded, size: 18),
+              label: const Text('Edit Student Data', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white.withOpacity(0.22),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                side: BorderSide(color: Colors.white.withOpacity(0.4)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -864,7 +899,15 @@ class _AdminStudentDetailsScreenState extends State<AdminStudentDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader(Icons.school_rounded, 'Academic Profile'),
+          _buildSectionHeader(
+            Icons.school_rounded,
+            'Academic Profile',
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
+              tooltip: 'Edit Student Data',
+              onPressed: _openEditStudentScreen,
+            ),
+          ),
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, c) {
