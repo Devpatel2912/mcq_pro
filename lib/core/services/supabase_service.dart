@@ -16,6 +16,7 @@ import 'package:mcq_test_app/models/chat_conversation.dart';
 import 'package:mcq_test_app/models/chat_message.dart';
 import 'package:mcq_test_app/models/chat_test_card.dart';
 import 'package:mcq_test_app/models/study_material.dart';
+import 'package:mcq_test_app/core/services/ai_generator_service.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
@@ -1152,7 +1153,16 @@ class SupabaseService {
   }
 
   Future<void> saveQuestions(List<Question> questions) async {
-    final maps = questions.map((q) => q.toMap()).toList();
+    if (questions.isEmpty) return;
+    final seen = <String>{};
+    final uniqueQuestions = <Question>[];
+    for (final q in questions) {
+      final norm = AiGeneratorService.normalizeQuestionText(q.questionText);
+      if (norm.isEmpty || seen.add(norm)) {
+        uniqueQuestions.add(q);
+      }
+    }
+    final maps = uniqueQuestions.map((q) => q.toMap()).toList();
     await supabase.from('questions').insert(maps);
   }
 

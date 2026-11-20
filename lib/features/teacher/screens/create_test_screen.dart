@@ -172,7 +172,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
   String? selectedMedium = 'English';
   String? selectedLevel = 'Boards / GUJCET';
   String? selectedSubject = 'Physics';
-  String selectedModel = 'gemini-2.5-flash';
+  String selectedModel = 'gpt-4o-mini';
   GenerationMode genMode = GenerationMode.topic;
   PlatformFile? selectedPdf;
 
@@ -355,12 +355,17 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
       }
 
       final aiService = AiGeneratorService();
+      final diff = selectedLevel?.toLowerCase().contains('jee') == true
+          ? 'Hard'
+          : (selectedLevel?.toLowerCase().contains('neet') == true ? 'Medium' : 'Medium');
+
       List<Question> questions;
       if (genMode == GenerationMode.pdf) {
         questions = await aiService.generateQuestionsFromPdf(
           subject: test.subject,
           topic: test.topic,
           level: test.level,
+          difficulty: diff,
           count: count,
           testId: '',
           medium: test.medium,
@@ -374,6 +379,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
           subject: test.subject,
           topic: test.topic,
           level: test.level,
+          difficulty: diff,
           count: count,
           testId: '',
           medium: test.medium,
@@ -397,6 +403,18 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
       // Snap to full before navigating
       if (mounted) setState(() => _generatedCount = questions.length);
 
+      if (questions.length < count && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Only ${questions.length} unique questions possible for this topic. Please use a broader topic or reduce the count.',
+            ),
+            backgroundColor: AppColors.warning,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+
       await Future.delayed(const Duration(milliseconds: 400));
 
       if (mounted) {
@@ -412,8 +430,14 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Generation error: $e'),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _generateQuestions,
+            ),
           ),
         );
       }
@@ -630,13 +654,11 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
     // Dynamic status message based on progress
     final String statusMsg;
     if (_generatedCount == 0) {
-      statusMsg = 'Preparing batches...';
-    } else if (progress < 0.5) {
-      statusMsg = 'Generating questions in parallel...';
+      statusMsg = 'Initializing batch generation...';
     } else if (progress < 1.0) {
-      statusMsg = 'Almost there, finishing up...';
+      statusMsg = 'Generating questions with de-duplication...';
     } else {
-      statusMsg = 'All questions ready!';
+      statusMsg = 'All $_targetCount questions ready!';
     }
 
     final done = progress >= 1.0;
@@ -787,7 +809,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                         child: FadeTransition(opacity: animation, child: child),
                       ),
                       child: Text(
-                        '$_generatedCount of $_targetCount questions generated',
+                        '$_generatedCount/$_targetCount questions ready',
                         key: ValueKey(_generatedCount),
                         style: const TextStyle(
                           fontSize: 13.5,
@@ -946,7 +968,12 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 Icons.translate_rounded,
                 _allowedMediums,
                 selectedMedium,
-                    (val) => setState(() => selectedMedium = val),
+                (val) => setState(() {
+                  selectedMedium = val;
+                  if (val?.toLowerCase() == 'gujarati') {
+                    selectedModel = 'gpt-4o';
+                  }
+                }),
               ),
             ],
           ),
@@ -1102,14 +1129,21 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: _fieldDecoration(icon: Icons.psychology_rounded),
-                items:
-                [
+                items: [
                   {
-                    'name': 'Gemini 2.5 Flash (Fast)',
+                    'name': 'GPT-4o mini (OpenAI - Fast & Structured)',
+                    'id': 'gpt-4o-mini',
+                  },
+                  {
+                    'name': 'GPT-4o (OpenAI - Highest Accuracy)',
+                    'id': 'gpt-4o',
+                  },
+                  {
+                    'name': 'Gemini 2.5 Flash (Google)',
                     'id': 'gemini-2.5-flash',
                   },
                   {
-                    'name': 'Gemini 2.5 Flash Lite (Light)',
+                    'name': 'Gemini 2.5 Flash Lite (Google)',
                     'id': 'gemini-2.5-flash-lite',
                   },
                 ]
