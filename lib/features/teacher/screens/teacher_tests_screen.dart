@@ -87,17 +87,34 @@ class TeacherTestsScreen extends StatelessWidget {
     final accentColor = status == 'draft' ? AppColors.secondary : AppColors.success;
 
     return AppCard(
-      onTap: status == 'draft' ? () async {
-        final questions = await supabase.getTestQuestions(test.id);
-        if (context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => QuestionPreviewScreen(test: test, questions: questions),
-            ),
-          );
+      onTap: () async {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        );
+        try {
+          final questions = await supabase.getTestQuestions(test.id);
+          if (context.mounted) {
+            Navigator.pop(context); // Close loading dialog
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => QuestionPreviewScreen(test: test, questions: questions),
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            Navigator.pop(context); // Close loading dialog
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to load questions: $e'), backgroundColor: AppColors.error),
+            );
+          }
         }
-      } : null,
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -121,7 +138,9 @@ class TeacherTestsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${test.subject}: ${test.topic}',
+                      (test.title != null && test.title!.isNotEmpty)
+                          ? '${test.subject}: ${test.title}'
+                          : '${test.subject}: ${test.topic}',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textPrimary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -133,6 +152,11 @@ class TeacherTestsScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: AppColors.textSecondary,
               ),
             ],
           ),
@@ -268,13 +292,57 @@ class _TeacherShareTestBottomSheet extends StatefulWidget {
 
 class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomSheet> {
   bool _isBroadcasting = false;
+  late Set<String> _selectedDivisions;
+  List<String> _availableDivisions = ['A', 'B', 'C'];
+
+  @override
+  void initState() {
+    super.initState();
+    final dStr = widget.test.division?.trim() ?? '';
+    if (dStr.isNotEmpty && dStr.toUpperCase() != 'ALL' && dStr.toUpperCase() != 'BOTH') {
+      _selectedDivisions = dStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    } else {
+      _selectedDivisions = {};
+    }
+    _loadTeacherDivisions();
+  }
+
+  Future<void> _loadTeacherDivisions() async {
+    final user = widget.supabase.currentUser;
+    if (user != null) {
+      final assignments = await widget.supabase.getTeacherAssignments(user.id);
+      if (mounted) {
+        final divs = assignments
+            .where((a) => a.standard.trim() == widget.test.studentClass.trim())
+            .map((a) {
+              var d = a.division.trim().toUpperCase();
+              if (d.startsWith('DIV ')) d = d.substring(4).trim();
+              return d;
+            })
+            .where((d) => d.isNotEmpty && d != 'ALL')
+            .toSet()
+            .toList();
+        divs.sort();
+        if (divs.isNotEmpty) {
+          setState(() => _availableDivisions = divs);
+        }
+      }
+    }
+  }
 
   Future<void> _broadcastToClass() async {
     setState(() => _isBroadcasting = true);
     try {
-      final count = await widget.supabase.broadcastTestToClass(test: widget.test);
+      final targetDivs = _selectedDivisions.isEmpty ? null : _selectedDivisions.toList();
+      final count = await widget.supabase.broadcastTestToClass(
+        test: widget.test,
+        targetDivisions: targetDivs,
+      );
       if (mounted) {
         Navigator.pop(context);
+        final divLabel = (targetDivs != null && targetDivs.isNotEmpty)
+            ? 'Div ${(targetDivs..sort()).join(', ')}'
+            : (widget.divStr.isNotEmpty ? widget.divStr : 'All Divisions');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -284,8 +352,8 @@ class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomShe
                 Expanded(
                   child: Text(
                     count > 0
-                        ? '🎉 Sent interactive test card to $count students in Std ${widget.test.studentClass}${widget.divStr}!'
-                        : 'Notice: No matching students enrolled in Std ${widget.test.studentClass}${widget.divStr}.',
+                        ? '🎉 Sent interactive test card to $count students in Std ${widget.test.studentClass} ($divLabel)!'
+                        : 'Notice: No matching students enrolled in Std ${widget.test.studentClass} ($divLabel).',
                   ),
                 ),
               ],
@@ -319,9 +387,42 @@ class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomShe
     );
   }
 
+  Widget _buildDivPill({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: isSelected ? const LinearGradient(colors: AppColors.primaryGradient) : null,
+          color: isSelected ? null : Colors.grey.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.withOpacity(0.25),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = widget.test;
+    final isAll = _selectedDivisions.isEmpty || _selectedDivisions.length == _availableDivisions.length;
+    final divLabel = isAll ? 'All Divisions' : 'Div ${(_selectedDivisions.toList()..sort()).join(', ')}';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.97),
@@ -382,7 +483,9 @@ class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomShe
                             ),
                           ),
                           Text(
-                            '${t.subject}: ${t.topic}',
+                            (t.title != null && t.title!.isNotEmpty)
+                                ? '${t.subject}: ${t.title}'
+                                : '${t.subject}: ${t.topic}',
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -403,7 +506,7 @@ class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomShe
 
                 const SizedBox(height: 18),
 
-                // Option 1: Broadcast to Entire Class
+                // Option 1: Broadcast to Class / Divisions
                 InkWell(
                   onTap: _isBroadcasting ? null : _broadcastToClass,
                   borderRadius: BorderRadius.circular(18),
@@ -421,75 +524,137 @@ class _TeacherShareTestBottomSheetState extends State<_TeacherShareTestBottomShe
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(color: AppColors.primary.withOpacity(0.28)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: AppColors.primaryGradient),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    'Broadcast to Std ${t.studentClass}${widget.divStr}',
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppColors.textPrimary,
-                                    ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: AppColors.primaryGradient),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.success.withOpacity(0.14),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      '1-Click',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.success,
+                                ],
+                              ),
+                              child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Broadcast to Std ${t.studentClass} ($divLabel)',
+                                          style: const TextStyle(
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.success.withOpacity(0.14),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          '1-Click',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Sends interactive test card to matching students in selected division(s).',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textSecondary.withOpacity(0.9),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Sends an interactive card to all enrolled students in this class.',
+                            ),
+                            const SizedBox(width: 8),
+                            if (_isBroadcasting)
+                              const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              const Icon(Icons.send_rounded, size: 18, color: AppColors.primary),
+                          ],
+                        ),
+                        if (_availableDivisions.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Text(
+                                'Divisions: ',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary.withOpacity(0.9),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    _buildDivPill(
+                                      label: 'All',
+                                      isSelected: isAll,
+                                      onTap: () => setState(() => _selectedDivisions.clear()),
+                                    ),
+                                    ..._availableDivisions.map((div) {
+                                      final isSelected = !isAll && _selectedDivisions.contains(div);
+                                      return _buildDivPill(
+                                        label: div,
+                                        isSelected: isSelected,
+                                        onTap: () {
+                                          setState(() {
+                                            if (isAll) {
+                                              _selectedDivisions.clear();
+                                              _selectedDivisions.add(div);
+                                            } else {
+                                              if (_selectedDivisions.contains(div)) {
+                                                _selectedDivisions.remove(div);
+                                              } else {
+                                                _selectedDivisions.add(div);
+                                                if (_selectedDivisions.length == _availableDivisions.length) {
+                                                  _selectedDivisions.clear();
+                                                }
+                                              }
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        if (_isBroadcasting)
-                          const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.primary),
+                        ],
                       ],
                     ),
                   ),

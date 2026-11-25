@@ -77,15 +77,13 @@ class _SplashScreenState extends State<SplashScreen>
       parent: _controller,
       curve: const Interval(0.6, 0.85, curve: Curves.easeOut),
     );
-    _taglineSlide = Tween<Offset>(
-      begin: const Offset(0, 0.6),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
+    _taglineSlide = Tween<Offset>(begin: const Offset(0, 0.6), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.6, 0.85, curve: Curves.easeOutCubic),
+          ),
+        );
     _loaderFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.7, 1.0, curve: Curves.easeOut),
@@ -123,7 +121,9 @@ class _SplashScreenState extends State<SplashScreen>
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Your account has been deactivated. Please contact administrator.'),
+                content: Text(
+                  'Your account has been deactivated. Please contact administrator.',
+                ),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -139,10 +139,13 @@ class _SplashScreenState extends State<SplashScreen>
           // If admin profile had must_change_password set, auto-clear it
           if (profile.mustChangePassword) {
             try {
-              await SupabaseService().supabase.from('users').update({
-                'must_change_password': false,
-                'temporary_password': null,
-              }).eq('id', user.id);
+              await SupabaseService().supabase
+                  .from('users')
+                  .update({
+                    'must_change_password': false,
+                    'temporary_password': null,
+                  })
+                  .eq('id', user.id);
             } catch (_) {}
           }
           Navigator.pushReplacement(
@@ -154,12 +157,16 @@ class _SplashScreenState extends State<SplashScreen>
           if (profile.mustChangePassword) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => ChangePasswordScreen(user: profile)),
+              MaterialPageRoute(
+                builder: (_) => ChangePasswordScreen(user: profile),
+              ),
             );
           } else {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => TeacherDashboard(user: profile)),
+              MaterialPageRoute(
+                builder: (_) => TeacherDashboard(user: profile),
+              ),
             );
           }
         } else if (profile.isStudent) {
@@ -219,7 +226,9 @@ class _SplashScreenState extends State<SplashScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.22 + 0.14 * pulse),
+                        color: AppColors.primary.withOpacity(
+                          0.22 + 0.14 * pulse,
+                        ),
                         blurRadius: 50 + 20 * pulse,
                         spreadRadius: 4 + 6 * pulse,
                       ),
@@ -283,8 +292,11 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         Transform.translate(
                           offset: Offset(0, -2 * math.sin(t * 2 * math.pi * 2)),
-                          child: const Icon(Icons.auto_stories,
-                              size: 56, color: Colors.white),
+                          child: const Icon(
+                            Icons.auto_stories,
+                            size: 56,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
@@ -341,10 +353,7 @@ class _SplashScreenState extends State<SplashScreen>
             end: Alignment(0 + shimmer * 4, 0),
             tileMode: TileMode.mirror,
           ).createShader(rect),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: letters,
-          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: letters),
         );
       },
     );
@@ -519,14 +528,15 @@ class _AmbientPainter extends CustomPainter {
       final dx = math.sin(t * 2 * math.pi + phase) * 24;
       final dy = math.cos(t * 2 * math.pi + phase) * 24;
       final paint = Paint()
-        ..shader = RadialGradient(
-          colors: [c.withOpacity(0.20), c.withOpacity(0.0)],
-        ).createShader(
-          Rect.fromCircle(
-            center: Offset(size.width * cx + dx, size.height * cy + dy),
-            radius: r,
-          ),
-        );
+        ..shader =
+            RadialGradient(
+              colors: [c.withOpacity(0.20), c.withOpacity(0.0)],
+            ).createShader(
+              Rect.fromCircle(
+                center: Offset(size.width * cx + dx, size.height * cy + dy),
+                radius: r,
+              ),
+            );
       canvas.drawCircle(
         Offset(size.width * cx + dx, size.height * cy + dy),
         r,
@@ -541,12 +551,15 @@ class _AmbientPainter extends CustomPainter {
     for (final p in particles) {
       final prog = (p.y - t * p.speed) % 1.0;
       final yy = (prog < 0 ? prog + 1 : prog) * size.height;
-      final xx = p.x * size.width +
-          math.sin(t * 2 * math.pi * 2 + p.phase) * 10;
+      final xx =
+          p.x * size.width + math.sin(t * 2 * math.pi * 2 + p.phase) * 10;
       final fade = math.sin((yy / size.height) * math.pi).clamp(0.0, 1.0);
       final paint = Paint()
-        ..color = Color.lerp(AppColors.primary, AppColors.secondary, p.x)!
-            .withOpacity(0.35 * fade);
+        ..color = Color.lerp(
+          AppColors.primary,
+          AppColors.secondary,
+          p.x,
+        )!.withOpacity(0.35 * fade);
       canvas.drawCircle(Offset(xx, yy), p.size, paint);
     }
   }
@@ -617,7 +630,8 @@ class _RingPainter extends CustomPainter {
 
     // Leading bright dot on the sweep arc
     final headAngle = angle + math.pi * 1.35;
-    final head = center + Offset(math.cos(headAngle), math.sin(headAngle)) * radius;
+    final head =
+        center + Offset(math.cos(headAngle), math.sin(headAngle)) * radius;
     canvas.drawCircle(
       head,
       6,

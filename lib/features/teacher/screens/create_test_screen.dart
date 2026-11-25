@@ -168,13 +168,22 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
     with TickerProviderStateMixin {
   int _currentStep = 0;
   String? selectedClass = '11';
-  String? selectedDivision;
+  Set<String> selectedDivisions = {}; // empty means 'All'
   String? selectedMedium = 'English';
   String? selectedLevel = 'Boards / GUJCET';
   String? selectedSubject = 'Physics';
-  String selectedModel = 'gpt-4o-mini';
+  String selectedModel = 'gemini-2.5-flash';
   GenerationMode genMode = GenerationMode.topic;
   PlatformFile? selectedPdf;
+
+  String? get formattedSelectedDivision {
+    if (selectedDivisions.isEmpty ||
+        selectedDivisions.length == _currentAllowedDivisions.length) {
+      return null; // Represents 'All' divisions
+    }
+    final sorted = selectedDivisions.toList()..sort();
+    return sorted.join(', ');
+  }
 
   List<String> _allowedStandards = ['11', '12'];
   List<String> _allowedMediums = ['English', 'Gujarati'];
@@ -182,6 +191,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
   List<String> _allowedDivisions = ['A', 'B', 'C'];
   List<TeacherAssignment> _rawAssignments = [];
 
+  final _titleController = TextEditingController();
   final _topicController = TextEditingController();
   final _topicHintController = TextEditingController();
   final _mcqCountController = TextEditingController(text: '10');
@@ -238,9 +248,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
             selectedSubject = _allowedSubjects.first;
           }
           final stdDivs = _currentAllowedDivisions;
-          if (stdDivs.isNotEmpty) {
-            selectedDivision = stdDivs.first;
-          }
+          selectedDivisions.removeWhere((d) => !stdDivs.contains(d));
         });
       }
     }
@@ -327,11 +335,13 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
         throw 'Please select a PDF file first';
       }
 
+      final titleText = _titleController.text.trim();
       final test = Test(
+        title: titleText.isNotEmpty ? titleText : null,
         teacherId: SupabaseService().currentUser?.id ?? '',
         testCode: _generateUniqueCode(),
         studentClass: selectedClass ?? '11',
-        division: selectedDivision,
+        division: formattedSelectedDivision,
         medium: selectedMedium?.toLowerCase() ?? 'english',
         subject: selectedSubject ?? 'Physics',
         topic: genMode == GenerationMode.pdf
@@ -944,23 +954,12 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 (val) => setState(() {
                   selectedClass = val;
                   final stdDivs = _currentAllowedDivisions;
-                  if (stdDivs.isNotEmpty &&
-                      selectedDivision != null &&
-                      !stdDivs.contains(selectedDivision)) {
-                    selectedDivision = stdDivs.first;
-                  }
+                  selectedDivisions.removeWhere((d) => !stdDivs.contains(d));
                 }),
               ),
               if (_currentAllowedDivisions.isNotEmpty) ...[
                 _glassDivider(),
-                _buildChoiceGroup(
-                  'Division',
-                  Icons.meeting_room_rounded,
-                  ['All', ..._currentAllowedDivisions],
-                  selectedDivision ?? 'All',
-                  (val) =>
-                      setState(() => selectedDivision = val == 'All' ? null : val),
-                ),
+                _buildDivisionSelector(),
               ],
               _glassDivider(),
               _buildChoiceGroup(
@@ -968,12 +967,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 Icons.translate_rounded,
                 _allowedMediums,
                 selectedMedium,
-                (val) => setState(() {
-                  selectedMedium = val;
-                  if (val?.toLowerCase() == 'gujarati') {
-                    selectedModel = 'gpt-4o';
-                  }
-                }),
+                (val) => setState(() => selectedMedium = val),
               ),
             ],
           ),
@@ -1044,12 +1038,24 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 ),
               ),
               const SizedBox(height: 22),
+              _buildLabel('Test Title'),
+              TextField(
+                controller: _titleController,
+                decoration: _fieldDecoration(
+                  hint: 'e.g. Weekly Test - 1, Unit Assessment',
+                  icon: Icons.title_rounded,
+                ),
+              ),
+              const SizedBox(height: 22),
               if (genMode == GenerationMode.topic) ...[
                 _buildLabel('Main Topic'),
                 TextField(
                   controller: _topicController,
+                  minLines: 3,
+                  maxLines: 5,
+                  keyboardType: TextInputType.multiline,
                   decoration: _fieldDecoration(
-                    hint: "e.g. Newton's Laws of Motion",
+                    hint: "e.g. Newton's Laws of Motion, or enter/paste detailed topics & sub-topics here...",
                     icon: Icons.topic_rounded,
                   ),
                 ),
@@ -1060,8 +1066,11 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 _buildLabel('Focus Area (Optional)'),
                 TextField(
                   controller: _topicHintController,
+                  minLines: 2,
+                  maxLines: 4,
+                  keyboardType: TextInputType.multiline,
                   decoration: _fieldDecoration(
-                    hint: 'e.g. Focus on Page 12-15',
+                    hint: 'e.g. Focus on Page 12-15 or specific subtopics',
                     icon: Icons.lightbulb_outline_rounded,
                   ),
                 ),
@@ -1131,20 +1140,20 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
                 decoration: _fieldDecoration(icon: Icons.psychology_rounded),
                 items: [
                   {
+                    'name': 'Gemini 2.5 Flash (Google - Fast & Recommended)',
+                    'id': 'gemini-2.5-flash',
+                  },
+                  {
+                    'name': 'Gemini 2.5 Flash Lite (Google - Light)',
+                    'id': 'gemini-2.5-flash-lite',
+                  },
+                  {
                     'name': 'GPT-4o mini (OpenAI - Fast & Structured)',
                     'id': 'gpt-4o-mini',
                   },
                   {
                     'name': 'GPT-4o (OpenAI - Highest Accuracy)',
                     'id': 'gpt-4o',
-                  },
-                  {
-                    'name': 'Gemini 2.5 Flash (Google)',
-                    'id': 'gemini-2.5-flash',
-                  },
-                  {
-                    'name': 'Gemini 2.5 Flash Lite (Google)',
-                    'id': 'gemini-2.5-flash-lite',
                   },
                 ]
                     .map(
@@ -1511,6 +1520,171 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
     );
   }
 
+  /// Multiple division selector with "All" and individual selectable pills (A, B, C, etc.)
+  Widget _buildDivisionSelector() {
+    final isAllSelected = selectedDivisions.isEmpty ||
+        selectedDivisions.length == _currentAllowedDivisions.length;
+
+    final sortedSelected = selectedDivisions.toList()..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.meeting_room_rounded, size: 16, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Division',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            if (!isAllSelected && selectedDivisions.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                ),
+                child: Text(
+                  selectedDivisions.length == 1
+                      ? 'Div ${sortedSelected.first}'
+                      : 'Div ${sortedSelected.join(', ')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            // "All" option
+            _buildDivisionChip(
+              label: 'All',
+              isSelected: isAllSelected,
+              showCheck: false,
+              onTap: () {
+                setState(() {
+                  selectedDivisions.clear();
+                });
+              },
+            ),
+            // Individual division pills (A, B, C...)
+            ..._currentAllowedDivisions.map((div) {
+              final isSelected = !isAllSelected && selectedDivisions.contains(div);
+              return _buildDivisionChip(
+                label: div,
+                isSelected: isSelected,
+                showCheck: isSelected,
+                onTap: () {
+                  setState(() {
+                    if (isAllSelected) {
+                      // Switching from All to a specific division
+                      selectedDivisions = {div};
+                    } else {
+                      if (selectedDivisions.contains(div)) {
+                        selectedDivisions.remove(div);
+                        // If everything deselected, automatically defaults to All
+                      } else {
+                        selectedDivisions.add(div);
+                        // If all divisions selected individually, clear to All
+                        if (selectedDivisions.length == _currentAllowedDivisions.length) {
+                          selectedDivisions.clear();
+                        }
+                      }
+                    }
+                  });
+                },
+              );
+            }),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivisionChip({
+    required String label,
+    required bool isSelected,
+    required bool showCheck,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: AppColors.primaryGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.62),
+                    Colors.white.withOpacity(0.28),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(isSelected ? 0.8 : 0.75),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showCheck) ...[
+              const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 14,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Label (with icon) on top, glass pill options wrapping underneath.
   /// Wrapping avoids overflow when there are many divisions / mediums.
   Widget _buildChoiceGroup(
@@ -1686,6 +1860,7 @@ class _CreateTestScreenState extends ConsumerState<CreateTestScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _titleController.dispose();
     _topicController.dispose();
     _topicHintController.dispose();
     _mcqCountController.dispose();

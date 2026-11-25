@@ -420,7 +420,12 @@ class PdfExportService {
     final metaRows = [
       ['Student Name: ${_cleanText(studentName)}', 'Roll Number: ${_cleanText(rollNumber)}'],
       ['Class & Division: Std ${test.studentClass} - ${test.division ?? "All"}', 'Medium: ${_cleanText(test.medium).toUpperCase()}'],
-      ['Subject: ${_cleanText(test.subject)}', 'Topic: ${_cleanText(test.topic)}'],
+      [
+        'Subject: ${_cleanText(test.subject)}',
+        (test.title != null && test.title!.trim().isNotEmpty)
+            ? 'Test: ${_cleanText(test.title!)}'
+            : 'Test Code: ${test.testCode ?? "N/A"}'
+      ],
       ['Test Code: ${test.testCode ?? "N/A"}', 'Submission Date: ${DateFormat.yMMMd().add_jm().format(subDate)}'],
       ['Score Obtained: $score / $total ($percentage%)', 'Performance: ${isPassed ? "PASSED" : "NEEDS PRACTICE"}'],
     ];
@@ -762,6 +767,8 @@ class PdfExportService {
     // Top Exam Assignment Banner (as shown in standard exam papers)
     final subjectStr = _cleanText(test.subject).toUpperCase();
     final classStr = 'Std-${test.studentClass} (${test.medium.toUpperCase()})';
+    final hasTitle = test.title != null && test.title!.trim().isNotEmpty;
+    final testTitleStr = hasTitle ? _cleanText(test.title!).toUpperCase() : '';
     final topicStr = _cleanText(test.topic).toUpperCase();
 
     final borderPaint = Paint()
@@ -806,7 +813,7 @@ class PdfExportService {
 
     final bRight = TextPainter(
       text: TextSpan(
-        text: topicStr.contains('ASSIGN') ? topicStr : 'ASSIGNMENT',
+        text: hasTitle ? testTitleStr : (topicStr.contains('ASSIGN') ? topicStr : 'ASSIGNMENT'),
         style: const TextStyle(
           fontFamily: _fontFamily,
           fontFamilyFallback: _fontFallback,
@@ -826,16 +833,16 @@ class PdfExportService {
     canvas.drawLine(Offset(0, y), Offset(width, y), borderPaint);
     y += 10;
 
-    // Title
+    // Title: When custom title is given, show ONLY test title (do not show main topic)
     final titlePainter = TextPainter(
-      text: const TextSpan(
-        text: 'MCQ PRO - TEST QUESTION PAPER',
+      text: TextSpan(
+        text: hasTitle ? testTitleStr : 'MCQ PRO - TEST QUESTION PAPER',
         style: TextStyle(
           fontFamily: _fontFamily,
           fontFamilyFallback: _fontFallback,
-          fontSize: 14,
+          fontSize: hasTitle ? 15 : 14,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF4F46E5),
+          color: const Color(0xFF4F46E5),
           letterSpacing: 0.5,
         ),
       ),
@@ -845,10 +852,10 @@ class PdfExportService {
     titlePainter.paint(canvas, Offset((width - titlePainter.width) / 2, y));
     y += titlePainter.height + 4;
 
-    // Subtitle
+    // Subtitle: Displays Subject (and does not expose main topic)
     final subPainter = TextPainter(
       text: TextSpan(
-        text: 'Subject: ${_cleanText(test.subject)}   |   Topic: ${_cleanText(test.topic)}',
+        text: 'Subject: ${_cleanText(test.subject)}',
         style: const TextStyle(
           fontFamily: _fontFamily,
           fontFamilyFallback: _fontFallback,
@@ -961,6 +968,8 @@ class PdfExportService {
 
     final subjectStr = _cleanText(test.subject).toUpperCase();
     final classStr = 'Std-${test.studentClass} ${test.medium.toUpperCase()}';
+    final hasTitle = test.title != null && test.title!.trim().isNotEmpty;
+    final testTitleStr = hasTitle ? _cleanText(test.title!).toUpperCase() : '';
     final topicStr = _cleanText(test.topic).toUpperCase();
 
     // Top border line
@@ -1006,10 +1015,10 @@ class PdfExportService {
     )..layout(maxWidth: colWidth);
     centerPainter.paint(canvas, Offset(colWidth + (colWidth - centerPainter.width) / 2, y));
 
-    // Right: Assignment Title
+    // Right: Assignment / Test Title (uses test title if provided, not exposing main topic)
     final rightPainter = TextPainter(
       text: TextSpan(
-        text: topicStr.contains('ASSIGN') ? topicStr : 'ASSIGNMENT',
+        text: hasTitle ? testTitleStr : (topicStr.contains('ASSIGN') ? topicStr : 'ASSIGNMENT'),
         style: const TextStyle(
           fontFamily: _fontFamily,
           fontFamilyFallback: _fontFallback,

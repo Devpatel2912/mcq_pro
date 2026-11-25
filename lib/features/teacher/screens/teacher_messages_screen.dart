@@ -6,6 +6,7 @@ import 'package:mcq_test_app/core/widgets/app_gradient_background.dart';
 import 'package:mcq_test_app/features/chat/screens/chat_screen.dart';
 import 'package:mcq_test_app/models/app_user.dart';
 import 'package:mcq_test_app/models/chat_conversation.dart';
+import 'package:mcq_test_app/features/teacher/widgets/broadcast_message_modal.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TeacherMessagesScreen extends StatefulWidget {
@@ -129,16 +130,35 @@ class _TeacherMessagesScreenState extends State<TeacherMessagesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showNewMessageDialog,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 6,
-        icon: const Icon(Icons.edit_note_rounded),
-        label: const Text(
-          'Message Student',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'fab_broadcast_msg',
+            onPressed: () => BroadcastMessageModal.show(context),
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 5,
+            icon: const Icon(Icons.campaign_rounded, size: 20),
+            label: const Text(
+              'Broadcast',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: 10),
+          FloatingActionButton.extended(
+            heroTag: 'fab_message_student',
+            onPressed: _showNewMessageDialog,
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.primary,
+            elevation: 5,
+            icon: const Icon(Icons.edit_note_rounded, size: 20),
+            label: const Text(
+              'Message Student',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
       body: AppGradientBackground(
         child: SafeArea(
@@ -208,6 +228,22 @@ class _TeacherMessagesScreenState extends State<TeacherMessagesScreen> {
                   ],
                 ),
               ),
+              Tooltip(
+                message: 'Broadcast Announcement',
+                child: ElevatedButton.icon(
+                  onPressed: () => BroadcastMessageModal.show(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.campaign_rounded, size: 16),
+                  label: const Text('Broadcast', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 onPressed: () => _loadConversations(showLoading: true),
                 icon: const Icon(Icons.refresh_rounded, size: 21),

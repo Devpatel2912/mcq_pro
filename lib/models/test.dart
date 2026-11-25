@@ -3,6 +3,7 @@ enum TestStatus { draft, published }
 class Test {
   final String id;
   final String? testCode;
+  final String? title;
   final String teacherId;
   final String studentClass;
   final String? division;
@@ -17,6 +18,7 @@ class Test {
   Test({
     this.id = '',
     this.testCode,
+    this.title,
     required this.teacherId,
     required this.studentClass,
     this.division,
@@ -42,15 +44,24 @@ class Test {
       return int.tryParse(val?.toString() ?? '') ?? 30;
     }
 
+    String? title = map['title']?.toString();
+    String topic = map['topic']?.toString() ?? 'Untitled';
+    if ((title == null || title.isEmpty) && topic.contains(':::title:')) {
+      final parts = topic.split(':::title:');
+      topic = parts[0];
+      title = parts[1];
+    }
+
     return Test(
       id: map['id']?.toString() ?? '',
       testCode: map['test_code']?.toString(),
+      title: title,
       teacherId: map['teacher_id']?.toString() ?? '',
       studentClass: (map['class'] ?? '11').toString(),
       division: map['division']?.toString(),
       medium: map['medium']?.toString() ?? 'English',
       subject: map['subject']?.toString() ?? 'General',
-      topic: map['topic']?.toString() ?? 'Untitled',
+      topic: topic,
       level: map['level']?.toString() ?? 'Medium',
       duration: parseDuration(map['duration']),
       status: parseStatus(map['status']),
@@ -59,7 +70,7 @@ class Test {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'test_code': testCode,
       'teacher_id': teacherId,
       'class': studentClass,
@@ -71,11 +82,16 @@ class Test {
       'duration': duration,
       'status': status.name,
     };
+    if (title != null && title!.trim().isNotEmpty) {
+      map['title'] = title!.trim();
+    }
+    return map;
   }
 
   Test copyWith({
     String? id,
     String? testCode,
+    String? title,
     String? teacherId,
     String? studentClass,
     String? division,
@@ -90,6 +106,7 @@ class Test {
     return Test(
       id: id ?? this.id,
       testCode: testCode ?? this.testCode,
+      title: title ?? this.title,
       teacherId: teacherId ?? this.teacherId,
       studentClass: studentClass ?? this.studentClass,
       division: division ?? this.division,

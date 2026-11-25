@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/services/supabase_service.dart';
 import 'package:mcq_test_app/features/student/screens/test_taking_screen.dart';
+import 'package:mcq_test_app/features/student/widgets/test_instructions_dialog.dart';
 import 'package:mcq_test_app/models/app_user.dart';
 import 'package:mcq_test_app/models/chat_test_card.dart';
 import 'package:mcq_test_app/models/test.dart';
@@ -161,6 +162,10 @@ class _ChatTestCardState extends State<ChatTestCard> {
 
       if (mounted) {
         setState(() => _isLoading = false);
+
+        final shouldStart = await TestInstructionsDialog.show(context, test!);
+        if (!shouldStart || !mounted) return;
+
         await Navigator.push(
           context,
           MaterialPageRoute(

@@ -16,6 +16,7 @@ import 'package:mcq_test_app/features/teacher/screens/teacher_profile_screen.dar
 import 'package:mcq_test_app/features/teacher/screens/teacher_results_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/teacher_students_screen.dart';
 import 'package:mcq_test_app/features/teacher/screens/teacher_tests_screen.dart';
+import 'package:mcq_test_app/features/teacher/widgets/broadcast_message_modal.dart';
 import 'package:mcq_test_app/models/api_key.dart';
 import 'package:mcq_test_app/models/app_user.dart';
 import 'package:mcq_test_app/models/chat_conversation.dart';
@@ -425,6 +426,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
                               subtitle: _unreadCount > 0
                                   ? '$_unreadCount unread student message${_unreadCount > 1 ? "s" : ""}'
                                   : 'Private student questions & inquiries',
+                              secondaryActionText: 'Broadcast',
+                              onSecondaryAction: () => BroadcastMessageModal.show(context),
                               actionText: 'View All',
                               onAction: _openMessages,
                             ),
@@ -968,6 +971,8 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
     required String subtitle,
     required String actionText,
     required VoidCallback onAction,
+    String? secondaryActionText,
+    VoidCallback? onSecondaryAction,
   }) {
     return Row(
       children: [
@@ -1017,6 +1022,26 @@ class _TeacherDashboardState extends ConsumerState<TeacherDashboard> {
             ],
           ),
         ),
+        if (secondaryActionText != null && onSecondaryAction != null) ...[
+          TextButton.icon(
+            onPressed: onSecondaryAction,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.campaign_rounded, size: 14, color: AppColors.primary),
+            label: Text(
+              secondaryActionText,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
         TextButton(
           onPressed: onAction,
           style: TextButton.styleFrom(

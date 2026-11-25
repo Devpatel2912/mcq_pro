@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:mcq_test_app/core/constants/app_colors.dart';
 import 'package:mcq_test_app/core/services/reaction_diagram_service.dart';
 import 'package:mcq_test_app/core/services/supabase_service.dart';
+import 'package:mcq_test_app/core/services/pdf_export_service.dart';
 import 'package:mcq_test_app/core/widgets/animated_page.dart';
 import 'package:mcq_test_app/core/widgets/app_gradient_background.dart';
 import 'package:mcq_test_app/core/widgets/formula_text.dart';
@@ -58,6 +59,7 @@ class _QuestionPreviewScreenState extends State<QuestionPreviewScreen>
         savedTest = widget.test.copyWith(status: status);
       } else {
         final testToSave = Test(
+          title: widget.test.title,
           teacherId: widget.test.teacherId,
           studentClass: widget.test.studentClass,
           division: widget.test.division,
@@ -307,7 +309,9 @@ class _QuestionPreviewScreenState extends State<QuestionPreviewScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.test.subject,
+                  (widget.test.title != null && widget.test.title!.isNotEmpty)
+                      ? widget.test.title!
+                      : widget.test.subject,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -318,7 +322,9 @@ class _QuestionPreviewScreenState extends State<QuestionPreviewScreen>
                 if (widget.test.topic.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    widget.test.topic,
+                    (widget.test.title != null && widget.test.title!.isNotEmpty)
+                        ? '${widget.test.subject}: ${widget.test.topic}'
+                        : widget.test.topic,
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.75),
                       fontSize: 13,
@@ -941,6 +947,83 @@ class _QuestionPreviewScreenState extends State<QuestionPreviewScreen>
   // ── Bottom bar ────────────────────────────────────────────────────────────
 
   Widget _buildBottomBar() {
+    if (widget.test.status == TestStatus.published) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: const Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Generating test question paper PDF...')),
+                    );
+                    try {
+                      final path = await PdfExportService.generateAndSaveTestPaperPdf(
+                        test: widget.test,
+                        questions: _questions,
+                        includeAnswerKey: true,
+                      );
+                      if (context.mounted && path != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('PDF downloaded: $path'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                  label: const Text('Download PDF', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
       decoration: BoxDecoration(

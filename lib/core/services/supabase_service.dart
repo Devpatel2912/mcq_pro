@@ -1137,8 +1137,22 @@ class SupabaseService {
 
   // ── Tests & Question Management ───────────────────────────────────────────
   Future<String> createTest(Test test) async {
-    final response = await supabase.from('tests').insert(test.toMap()).select().single();
-    return response['id'];
+    try {
+      final response = await supabase.from('tests').insert(test.toMap()).select().single();
+      return response['id'];
+    } catch (e) {
+      // If 'title' column does not exist on remote table yet, pack title in topic
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('title')) {
+        final fallbackMap = Map<String, dynamic>.from(test.toMap())..remove('title');
+        if (test.title != null && test.title!.trim().isNotEmpty) {
+          fallbackMap['topic'] = '${test.topic}:::title:${test.title!.trim()}';
+        }
+        final response = await supabase.from('tests').insert(fallbackMap).select().single();
+        return response['id'];
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateTest(String testId, TestStatus status) async {
@@ -1260,11 +1274,14 @@ class SupabaseService {
           if (tMed != sMedClean) return false;
         }
 
-        // Match Division if specified ('All' or 'Both' applies to all divisions)
+        // Match Division if specified ('All' or 'Both' applies to all divisions, or comma-separated e.g. 'A, B')
         if (test.division != null && test.division!.trim().isNotEmpty) {
           final tDiv = test.division!.trim().toUpperCase();
-          if (tDiv != 'ALL' && tDiv != 'BOTH' && sDivClean.isNotEmpty && tDiv != sDivClean) {
-            return false;
+          if (tDiv != 'ALL' && tDiv != 'BOTH' && sDivClean.isNotEmpty) {
+            final allowedDivs = tDiv.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+            if (!allowedDivs.contains(sDivClean)) {
+              return false;
+            }
           }
         }
 
@@ -1632,11 +1649,14 @@ class SupabaseService {
           if (tMed != sMedClean) return false;
         }
 
-        // Match Division if specified ('All' or 'Both' applies to all divisions)
+        // Match Division if specified ('All' or 'Both' applies to all divisions, or comma-separated e.g. 'A, B')
         if (test.division != null && test.division!.trim().isNotEmpty) {
           final tDiv = test.division!.trim().toUpperCase();
-          if (tDiv != 'ALL' && tDiv != 'BOTH' && sDivClean.isNotEmpty && tDiv != sDivClean) {
-            return false;
+          if (tDiv != 'ALL' && tDiv != 'BOTH' && sDivClean.isNotEmpty) {
+            final allowedDivs = tDiv.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+            if (!allowedDivs.contains(sDivClean)) {
+              return false;
+            }
           }
         }
 
@@ -2194,6 +2214,7 @@ class SupabaseService {
   /// Broadcasts an interactive test card to all authorized students matching the test's class and division
   Future<int> broadcastTestToClass({
     required Test test,
+    List<String>? targetDivisions,
   }) async {
     final user = currentUser;
     if (user == null) throw 'User session expired. Please log in.';
@@ -2202,12 +2223,16 @@ class SupabaseService {
     if (authorizedStudents.isEmpty) return 0;
 
     final testStd = test.studentClass.trim();
-    final testDiv = test.division?.trim().toUpperCase() ?? '';
+    final effectiveDiv = (targetDivisions != null && targetDivisions.isNotEmpty)
+        ? targetDivisions.join(', ')
+        : (test.division ?? '');
+    final testDiv = effectiveDiv.trim().toUpperCase();
 
     // Filter students matching the target standard & division
     final matchingStudents = authorizedStudents.where((student) {
       final sStd = (student.studentClass ?? '').trim();
-      final sDiv = (student.division ?? '').trim().toUpperCase();
+      var sDiv = (student.division ?? '').trim().toUpperCase();
+      if (sDiv.startsWith('DIV ')) sDiv = sDiv.substring(4).trim();
 
       // Standard match (comparing digits or exact string)
       final testDigit = RegExp(r'\d+').firstMatch(testStd)?.group(0);
@@ -2218,9 +2243,10 @@ class SupabaseService {
 
       if (!isClassMatch) return false;
 
-      // Division match (if test specifies a division that is not ALL/BOTH)
+      // Division match (if test specifies a division that is not ALL/BOTH, supports comma-separated e.g. 'A, B')
       if (testDiv.isNotEmpty && testDiv != 'ALL' && testDiv != 'BOTH') {
-        if (sDiv.isNotEmpty && sDiv != testDiv) {
+        final allowedDivs = testDiv.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+        if (sDiv.isNotEmpty && !allowedDivs.contains(sDiv)) {
           return false;
         }
       }
@@ -2250,6 +2276,69 @@ class SupabaseService {
       }
     }
 
+    return sentCount;
+  }
+
+  /// Broadcasts a text announcement message to all authorized students matching the target standard & division(s)
+  Future<int> broadcastMessageToClass({
+    required String standard,
+    required List<String> divisions, // empty or ['All'] means all assigned divisions; or ['A'], ['A', 'B']
+    required String messageText,
+  }) async {
+    final user = currentUser;
+    if (user == null) throw 'User session expired. Please log in.';
+
+    final authorizedStudents = await getAuthorizedStudentsForCurrentTeacher();
+    if (authorizedStudents.isEmpty) return 0;
+
+    final targetStd = standard.trim();
+    final allowedDivs = divisions
+        .map((d) => d.trim().toUpperCase())
+        .where((d) => d.isNotEmpty && d != 'ALL')
+        .toSet();
+
+    final matchingStudents = authorizedStudents.where((student) {
+      final sStd = (student.studentClass ?? '').trim();
+      var sDiv = (student.division ?? '').trim().toUpperCase();
+      if (sDiv.startsWith('DIV ')) sDiv = sDiv.substring(4).trim();
+
+      // Standard match
+      final testDigit = RegExp(r'\d+').firstMatch(targetStd)?.group(0);
+      final studentDigit = RegExp(r'\d+').firstMatch(sStd)?.group(0);
+      final isClassMatch = (testDigit != null && studentDigit != null)
+          ? (testDigit == studentDigit)
+          : (targetStd.toLowerCase() == sStd.toLowerCase());
+
+      if (!isClassMatch) return false;
+
+      // Division match (if specific divisions are specified)
+      if (allowedDivs.isNotEmpty) {
+        if (sDiv.isNotEmpty && !allowedDivs.contains(sDiv)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    if (matchingStudents.isEmpty) return 0;
+
+    int sentCount = 0;
+    for (final student in matchingStudents) {
+      try {
+        final conversationId = await getOrCreateConversation(
+          teacherId: user.id,
+          studentId: student.id,
+        );
+        await sendMessage(
+          conversationId: conversationId,
+          messageText: messageText,
+        );
+        sentCount++;
+      } catch (e) {
+        debugPrint('Failed to send broadcast message to student ${student.id}: $e');
+      }
+    }
     return sentCount;
   }
 

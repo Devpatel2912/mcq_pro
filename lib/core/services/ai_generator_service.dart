@@ -34,11 +34,28 @@ class AiGeneratorService {
   int get estimatedTokensUsed => _estimatedTokensUsed;
   void resetTokenCount() => _estimatedTokensUsed = 0;
 
+  /// Determines whether to route calls to OpenAI or Google Gemini.
+  /// Keys starting with 'AIza' are strictly Google Gemini keys.
+  /// Keys starting with 'sk-' are strictly OpenAI keys.
+  static bool shouldUseOpenAi({required String apiKey, required String modelName}) {
+    final cleanKey = apiKey.trim();
+    if (cleanKey.startsWith('AIza')) {
+      return false; // Strictly Google Gemini
+    }
+    if (cleanKey.startsWith('sk-')) {
+      return true; // Strictly OpenAI
+    }
+    if (modelName.toLowerCase().contains('gemini')) {
+      return false; // Gemini model selected
+    }
+    return modelName.toLowerCase().startsWith('gpt');
+  }
+
   Future<bool> verifyApiKey(String apiKey, {String modelName = 'gemini-2.5-flash'}) async {
     final cleanKey = apiKey.trim();
     if (cleanKey.isEmpty) return false;
 
-    if (cleanKey.startsWith('sk-') || modelName.toLowerCase().startsWith('gpt')) {
+    if (shouldUseOpenAi(apiKey: cleanKey, modelName: modelName)) {
       try {
         final url = Uri.parse('https://api.openai.com/v1/models');
         final res = await http.get(url, headers: {
@@ -51,8 +68,9 @@ class AiGeneratorService {
     }
 
     try {
+      final geminiModel = modelName.toLowerCase().contains('gemini') ? modelName : 'gemini-2.5-flash';
       final model = GenerativeModel(
-        model: modelName,
+        model: geminiModel,
         apiKey: cleanKey,
       );
       final response = await model.generateContent([Content.text('Hi')]).timeout(const Duration(seconds: 10));
@@ -256,7 +274,7 @@ class AiGeneratorService {
     List<String> excludedConcepts = const [],
   }) async {
     final cleanKey = apiKey.trim();
-    final isLikelyOpenAi = cleanKey.startsWith('sk-') || modelName.toLowerCase().startsWith('gpt');
+    final useOpenAi = shouldUseOpenAi(apiKey: cleanKey, modelName: modelName);
 
     final excludeClause = excludedConcepts.isEmpty
         ? ''
@@ -270,7 +288,7 @@ class AiGeneratorService {
         'Return ONLY JSON: {"concepts":[{"id":1,"concept":"..."}]}';
 
     dynamic rawJson;
-    if (isLikelyOpenAi) {
+    if (useOpenAi) {
       final url = Uri.parse('https://api.openai.com/v1/chat/completions');
       final res = await http.post(
         url,
@@ -279,7 +297,7 @@ class AiGeneratorService {
           'Authorization': 'Bearer $cleanKey',
         },
         body: jsonEncode({
-          'model': modelName,
+          'model': modelName.startsWith('gpt') ? modelName : 'gpt-4o-mini',
           'temperature': 0.8,
           'frequency_penalty': 0.5,
           'presence_penalty': 0.5,
@@ -308,9 +326,10 @@ class AiGeneratorService {
       final content = decoded['choices']?[0]?['message']?['content'] ?? '{}';
       rawJson = decodeJsonObjectOrArray(content);
     } else {
-      // Gemini fallback
+      // Gemini
+      final geminiModel = modelName.toLowerCase().contains('gemini') ? modelName : 'gemini-2.5-flash';
       final model = GenerativeModel(
-        model: modelName,
+        model: geminiModel,
         apiKey: cleanKey,
         systemInstruction: Content.system(
           'You are an expert exam setter. Return valid JSON only, no extra text, no markdown.',
@@ -507,15 +526,13 @@ class AiGeneratorService {
     const int maxAttempts = 20;
 
     final cleanKey = apiKey.trim();
-    final isLikelyOpenAi = cleanKey.startsWith('sk-') || modelName.toLowerCase().startsWith('gpt');
+    final useOpenAi = shouldUseOpenAi(apiKey: cleanKey, modelName: modelName);
 
     // LAYER 4: Model Selection
-    // Gujarati tests require gpt-4o or better for accurate script & zero grammar errors.
-    // English tests may use gpt-4o-mini or teacher's selection.
     final isGujarati = medium.trim().toLowerCase() == 'gujarati';
-    final activeModel = isLikelyOpenAi
+    final activeModel = useOpenAi
         ? (isGujarati ? 'gpt-4o' : (modelName.startsWith('gpt') ? modelName : 'gpt-4o-mini'))
-        : modelName;
+        : (modelName.toLowerCase().contains('gemini') ? modelName : 'gemini-2.5-flash');
 
     // Difficulty mapping
     final String diffStr;
@@ -673,7 +690,7 @@ The "questions" array must contain exactly $currentBatchSize items.
       while (retryCount <= _maxRetries && rawBatchItems == null) {
         try {
           totalApiCalls++;
-          if (isLikelyOpenAi) {
+          if (useOpenAi) {
             rawBatchItems = await _callOpenAi(
               prompt: prompt,
               apiKey: cleanKey,
@@ -768,7 +785,7 @@ The "questions" array must contain exactly $currentBatchSize items.
 
       // Step B: LAYER 3(c) Semantic Similarity via text-embedding-3-small
       List<List<double>> newEmbeddings = [];
-      if (isLikelyOpenAi && candidateEmbedTexts.isNotEmpty && acceptedEmbeddings.isNotEmpty) {
+      if (useOpenAi && candidateEmbedTexts.isNotEmpty && acceptedEmbeddings.isNotEmpty) {
         totalApiCalls++;
         newEmbeddings = await _getOpenAiEmbeddings(
           inputs: candidateEmbedTexts,
@@ -888,11 +905,11 @@ The "questions" array must contain exactly $currentBatchSize items.
     final hintLine = topic.trim().isEmpty ? '' : '\nTopic hint: "$topic"';
 
     final cleanKey = apiKey.trim();
-    final isLikelyOpenAi = cleanKey.startsWith('sk-') || modelName.toLowerCase().startsWith('gpt');
+    final useOpenAi = shouldUseOpenAi(apiKey: cleanKey, modelName: modelName);
     final isGujarati = medium.trim().toLowerCase() == 'gujarati';
-    final activeModel = isLikelyOpenAi
+    final activeModel = useOpenAi
         ? (isGujarati ? 'gpt-4o' : (modelName.startsWith('gpt') ? modelName : 'gpt-4o-mini'))
-        : modelName;
+        : (modelName.toLowerCase().contains('gemini') ? modelName : 'gemini-2.5-flash');
 
     final acceptedQuestions = <Question>[];
     final seenNormalizedSet = <String>{};
@@ -958,7 +975,7 @@ The "questions" array must contain exactly $currentBatchSize items.
       int retryCount = 0;
       while (retryCount <= _maxRetries && batchData == null) {
         try {
-          if (isLikelyOpenAi) {
+          if (useOpenAi) {
             batchData = await _callOpenAi(
               prompt: prompt,
               apiKey: cleanKey,

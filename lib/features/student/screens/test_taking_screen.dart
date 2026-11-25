@@ -238,8 +238,9 @@ class _TestTakingScreenState extends State<TestTakingScreen>
         if (!didPop) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Cannot exit test once started!'),
+              content: Text('⚠️ Cannot exit test once started! Leaving this screen will automatically submit your exam.'),
               backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }

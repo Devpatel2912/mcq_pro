@@ -11,6 +11,7 @@ import 'package:mcq_test_app/features/student/screens/student_materials_screen.d
 import 'package:mcq_test_app/features/student/screens/result_screen.dart';
 import 'package:mcq_test_app/features/student/screens/student_chat_list_screen.dart';
 import 'package:mcq_test_app/features/student/screens/test_taking_screen.dart';
+import 'package:mcq_test_app/features/student/widgets/test_instructions_dialog.dart';
 import 'package:mcq_test_app/models/app_user.dart';
 import 'package:mcq_test_app/models/assigned_teacher.dart';
 import 'package:mcq_test_app/models/chat_conversation.dart';
@@ -274,16 +275,18 @@ class _StudentDashboardState extends State<StudentDashboard> {
       final studentDivClean = studentDivision.trim().toUpperCase();
       if (testDiv.isNotEmpty &&
           testDiv != 'ALL' &&
-          testDiv != 'BOTH' &&
-          testDiv != studentDivClean) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'This test is for Division $testDiv, but you are in Division $studentDivision',
+          testDiv != 'BOTH') {
+        final allowedDivs = testDiv.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+        if (studentDivClean.isNotEmpty && !allowedDivs.contains(studentDivClean)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'This test is for Division $testDiv, but you are in Division $studentDivision',
+              ),
             ),
-          ),
-        );
-        return;
+          );
+          return;
+        }
       }
 
       final alreadyAttempted = await _supabase.hasAttemptedTest(test.id);
@@ -296,6 +299,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
         );
         return;
       }
+
+      final shouldStart = await TestInstructionsDialog.show(context, test);
+      if (!shouldStart || !mounted) return;
 
       await Navigator.push(
         context,
